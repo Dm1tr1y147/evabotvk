@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import vk_api
+from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from vk_api.utils import get_random_id
 import random
@@ -22,7 +23,7 @@ owner_id = 318741811
 
 def send_message(chat_id, message):
     vk.messages.send(random_id=get_random_id(),
-                     peer_id=chat_id + 2000000000,
+                     peer_id=chat_id,
                      message=message)
 
 
@@ -37,7 +38,7 @@ def tyanki(chat_id, username):
     access_key = photo[0]['access_key']
     attachment = f"photo{owner_id}_{photo_id}_{access_key}"
 
-    vk.messages.send(peer_id=chat_id + 2000000000, random_id=get_random_id(),
+    vk.messages.send(peer_id=chat_id, random_id=get_random_id(),
                      message=f'{username}, руки на стол!',
                      attachment=attachment)
 
@@ -66,17 +67,17 @@ def kick(chat_id, username, kick_command, sex_id):
             kick_command = kick_command.split(':')
             name = kick_command[0]
             with_words = kick_command[1]
-            vk.messages.send(peer_id=chat_id + 2000000000, random_id=get_random_id(),
+            vk.messages.send(peer_id=chat_id, random_id=get_random_id(),
                              message=f'{username} ударил{postfix} {name} со словами: "{with_words}" &#128074;',
                              attachment=attachment)
         else:
             name = kick_command
-            vk.messages.send(peer_id=chat_id + 2000000000, random_id=get_random_id(),
+            vk.messages.send(peer_id=chat_id, random_id=get_random_id(),
                              message=f'{username} ударил{postfix} {name} &#128074;',
                              attachment=attachment)
     except Exception:
         send_message(chat_id, 'Ошибка. Запишите команду, как на примере: "Ева ударить Обама" или '
-                              'Ева ударить Обама: получай!')
+                              '"Ева ударить Обама: получай!"')
 
 
 def send_kek(chat_id, username):
@@ -99,7 +100,7 @@ def send_kek(chat_id, username):
 
     attachment2 = f'photo{owner_id}_{photo_id}_{access_key}'
 
-    vk.messages.send(peer_id=chat_id + 2000000000, random_id=get_random_id(),
+    vk.messages.send(peer_id=chat_id, random_id=get_random_id(),
                      message=f'{username}, держи',
                      attachment=[attachment1, attachment2])
     os.remove('photo1.jpg')
@@ -115,7 +116,7 @@ def send_invert(chat_id, username):
     access_key = photo[0]['access_key']
     attachment = f'photo{owner_id}_{photo_id}_{access_key}'
 
-    vk.messages.send(peer_id=chat_id + 2000000000, random_id=get_random_id(),
+    vk.messages.send(peer_id=chat_id, random_id=get_random_id(),
                      message=f'{username}, держи',
                      attachment=attachment)
     os.remove('imginverted.jpg')
@@ -130,7 +131,7 @@ def send_3d(chat_id, username):
     access_key = photo[0]['access_key']
     attachment = f'photo{owner_id}_{photo_id}_{access_key}'
 
-    vk.messages.send(peer_id=chat_id + 2000000000, random_id=get_random_id(),
+    vk.messages.send(peer_id=chat_id, random_id=get_random_id(),
                      message=f'{username}, держи',
                      attachment=attachment)
     os.remove('imgres3d.jpg')
@@ -150,11 +151,39 @@ def check_nickname(user_id):
         return nickname_db
 
 
+def send_list(chat_id, list_message, k=5):
+    def lambda_list(x):
+        return x['first_name'] + " " + x['last_name']
+
+    users_send = []
+    dictionary_with_user_data_send = vk.messages.getConversationMembers(peer_id=id_chat)
+    for user_send in dictionary_with_user_data_send['items']:
+        if str(user_send['member_id'])[0] != '-':
+            users_send.append(int(user_send['member_id']))
+    n = len(users_send)
+    if n < k:
+        k = n
+    if k > 20:
+        k = 20
+    chose = random.sample(users_send, k)
+    final_string = ''
+    user_got = vk.users.get(user_ids=chose)
+    names = list(map(lambda_list, user_got))
+    i = 0
+    for x in names:
+        i += 1
+        final_string += str(i) + ") " + x + '\n'
+    send_message(chat_id, f'Список {list_message}:\n {final_string}')
+
+
 while True:
     try:
         for event in longpoll.listen():
-            if event.type == VkBotEventType.MESSAGE_NEW:
+            if event.type == VkBotEventType.MESSAGE_NEW or event.type == VkEventType.MESSAGE_NEW:
                 message = event.object["text"]
+                conversation_flag = False
+                if event.type == VkBotEventType.MESSAGE_NEW:
+                    conversation_flag = True
                 if message.split(' ')[0].lower() == "ева" or message.split(' ')[0].lower() == "евочка" or \
                         message.split(' ')[0].lower() == "ева,":
                     time_start = datetime.datetime.now()
@@ -162,17 +191,21 @@ while True:
                     sex = vk.users.get(user_ids=sender_id, fields='sex')[0]['sex']
                     username = check_nickname(sender_id)
                     id_chat = event.chat_id
+                    if id_chat is None:
+                        id_chat = event.object.peer_id
+                    else:
+                        id_chat += 2000000000
                     command = message.split(' ')
                     command.pop(0)
                     command = ' '.join(command)
                     command_lower = command.lower()
-                    if command_lower == 'привет':
+                    if 'привет' in command_lower:
                         send_message(id_chat,
                                      f'{username}, приветики!!!')
-                    elif command_lower == 'сап':
+                    elif 'сап' in command_lower:
                         send_message(id_chat,
                                      f'{username}, сап, омежка :3')
-                    elif command_lower == 'салам' or command_lower == 'салам алейкум':
+                    elif 'салам' in command_lower or 'салам алейкум' in command_lower:
                         send_message(id_chat,
                                      f'{username}, алейкум асалам,'
                                      f' брат')
@@ -181,7 +214,7 @@ while True:
                                      f'{username}, {random.choice(sphere)}')
                     elif 'тянка' in command_lower or 'тяночка' in command_lower or 'тян' in command_lower:
                         tyanki(id_chat, username)
-                    elif 'ударить' in command_lower:
+                    elif 'ударить' in command_lower and conversation_flag:
                         kick(id_chat, username, command, sex)
                     elif 'фото кек' in command_lower:
                         try:
@@ -230,9 +263,9 @@ while True:
                             send_message(id_chat, 'Ник установлен!')
                         else:
                             send_message(id_chat, 'Слишком много символов! (максимум 20, минимум 2)')
-                    elif 'кто ' in command:
+                    elif 'кто ' in command and conversation_flag:
                         users = []
-                        dictionary_with_user_data = vk.messages.getConversationMembers(peer_id=id_chat + 2000000000)
+                        dictionary_with_user_data = vk.messages.getConversationMembers(peer_id=id_chat)
                         for user in dictionary_with_user_data['items']:
                             if str(user['member_id'])[0] != '-':
                                 users.append(int(user['member_id']))
@@ -243,6 +276,19 @@ while True:
                         last_name = user_get['last_name']
                         full_name = first_name + " " + last_name
                         send_message(id_chat, f'Уверена, что это {full_name}')
+                    elif 'список ' in command_lower and conversation_flag:
+                        command_list = command.split(' ')
+                        command_list.pop(0)
+                        if 'тест' in command_list:
+                            command_list.remove('тест')
+                        try:
+                            count = int(command_list[0])
+                            command_list.pop(0)
+                            message_list = ' '.join(command_list)
+                            send_list(id_chat, message_list, count)
+                        except Exception:
+                            message_list = ' '.join(command_list)
+                            send_list(id_chat, message_list)
                     time_finish = datetime.datetime.now()
                     time_delta = str(time_finish - time_start).split(':')[2]
                     if ' тест' in command_lower:
